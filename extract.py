@@ -42,6 +42,9 @@ class parse:
 
 
     def make_adts_headers(self, tag_data_size):
+        '''
+        according to the doc, add adts headers
+        '''
         # adts_fixed_header
         bit_headers = format(0xFFF, 'b') + "0" + "00" + "1" + \
         format(self._audio_object_type-1, "02b") + format(self._sampling_frequency_index, "04b") + \
