@@ -10,4 +10,5 @@ for example
 ./extract.py -i xb2.flv -o xb2.aac
 
 # todo
-maybe add video extract support.
+//maybe add video extract support.
+added
