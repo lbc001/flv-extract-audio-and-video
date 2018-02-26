@@ -7,8 +7,9 @@ This project is used to extract .aac audio file from the flv video and only .acc
 # usage
 for example
 
-./extract.py -i xb2.flv -o xb2.aac
+./extract.py -i xb2_kos.flv -o xb2_kos.aac
 
+./extract.py -i xb2_kos.flv -o xb2_kos.h264
 # todo
 //maybe add video extract support.
 
