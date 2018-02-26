@@ -4,7 +4,8 @@ the main parse module
 '''
 import argparse
 from utils import AUDIO, VIDEO, SCRIPT
-from utils import audio_tag_header
+from utils import audio_tag_header, video_tag_header
+from utils import bytes_to_int
 
 
 class parse:
@@ -14,13 +15,8 @@ class parse:
         self._size = len(self._flv_data)
         self._bytes_begin = 13 # 3 + 1 + 1 + 4 + 4
         self._acc_data = b""
+        self._h264_data = b""
         self._audio_tag_header = None
-
-    def bytes_to_int(self, bytes_string):
-        '''
-        pack of the int.from_bytes
-        '''
-        return int.from_bytes(bytes_string, byteorder="big")
 
     def header_assert(self):
         '''
@@ -61,9 +57,9 @@ class parse:
         current = self._bytes_begin
         while current < self._size:
             tag_type = self._flv_data[current]         
-            tag_data_size = self.bytes_to_int(self._flv_data[current + 1 : current + 4])
+            tag_data_size = bytes_to_int(self._flv_data[current + 1 : current + 4])
+            tag_data = self._flv_data[current + 11 : current + 11 + tag_data_size]
             if tag_type == AUDIO:
-                tag_data = self._flv_data[current + 11 : current + 11 + tag_data_size]
                 if self._audio_tag_header is None:
                     self._audio_tag_header = audio_tag_header(format(tag_data[0], 'b'))
                     assert(self._audio_tag_header.soundformat == 10)
@@ -71,32 +67,68 @@ class parse:
                     self.calculate_audio_specific_config(tag_data[2:])
                 else:
                     self._acc_data += self.make_adts_headers(tag_data_size-2) + tag_data[2:]
-
             current += 11 + tag_data_size
-            assert(self.bytes_to_int(self._flv_data[current : current + 4]) == 11 + tag_data_size)
+            assert(bytes_to_int(self._flv_data[current : current + 4]) == 11 + tag_data_size)
             current += 4
     
-    def save_acc_data(self, output_file):
+    def video_extract(self):
+        '''
+        seperate the .h264 video from the flv video
+        '''
+        current = self._bytes_begin
+        while current < self._size:
+            tag_type = self._flv_data[current]         
+            tag_data_size = bytes_to_int(self._flv_data[current + 1 : current + 4])
+            tag_data = self._flv_data[current + 11 : current + 11 + tag_data_size]
+            if tag_type == VIDEO:
+                if tag_data[0] == 0x17 and tag_data[1] == 0x00:
+                    self._video_tag_header = video_tag_header(tag_data)
+                    self._h264_data += b"\x00\x00\x00\x01" + self._video_tag_header.sps_data + b"\x00\x00\x00\x01" + self._video_tag_header.pps_data 
+                else:
+                    assert((tag_data[0] & 0xf) == 7) #assert for avc only
+                    if tag_data[1] == 0x1:
+                        nalu_length = bytes_to_int(tag_data[5:9])
+                        begin = 9
+                        if begin + nalu_length == tag_data_size:
+                            self._h264_data += b"\x00\x00\x00\x01" + tag_data[9:]
+                        else:
+                            while True:
+                                self._h264_data += b"\x00\x00\x00\x01" + tag_data[begin:begin+nalu_length]
+                                begin += nalu_length
+                                if begin == tag_data_size:
+                                    break
+                                nalu_length = bytes_to_int(tag_data[begin:begin+4])
+                                begin += 4    
+            current += 11 + tag_data_size
+            assert(bytes_to_int(self._flv_data[current : current + 4]) == 11 + tag_data_size)
+            current += 4
+
+    def save_extract_data(self, output_file):
         '''
         save the data to the file
         '''
-        if output_file.split(".")[-1] != "aac":
+        if output_file.split(".")[-1] == "aac":
+            self.audio_extract()
+            with open(output_file, "wb") as f:
+                f.write(self._acc_data)
+        elif output_file.split(".")[-1] == "h264":
+            self.video_extract()
+            with open(output_file, "wb") as f:
+                f.write(self._h264_data)
+        else:
             raise RuntimeError("the output file must end with aac!")
-        with open(output_file, "wb") as f:
-            f.write(self._acc_data)
             
     def start(self):
         '''
         start the project
         '''
         self.header_assert()
-        self.audio_extract()
-        self.save_acc_data(self._output_file)
+        self.save_extract_data(self._output_file)
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("-i", "--input", help="enter the input file")
-    arg_parser.add_argument("-o", "--output", help="enter the output file, end with .aac" )
+    arg_parser.add_argument("-o", "--output", help="enter the output file, end with .aac or .h264" )
     args = arg_parser.parse_args()
     client = parse(args.input, args.output)
     client.start()
