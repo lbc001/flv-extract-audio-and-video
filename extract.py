@@ -57,8 +57,8 @@ class parse:
         current = self._bytes_begin
         while current < self._size:
             tag_type = self._flv_data[current]         
-            tag_data_size = bytes_to_int(self._flv_data[current + 1 : current + 4])
-            tag_data = self._flv_data[current + 11 : current + 11 + tag_data_size]
+            tag_data_size = bytes_to_int(self._flv_data[current+1:current+4])
+            tag_data = self._flv_data[current+11:current+11+tag_data_size]
             if tag_type == AUDIO:
                 if self._audio_tag_header is None:
                     self._audio_tag_header = audio_tag_header(format(tag_data[0], 'b'))
@@ -68,7 +68,7 @@ class parse:
                 else:
                     self._acc_data += self.make_adts_headers(tag_data_size-2) + tag_data[2:]
             current += 11 + tag_data_size
-            assert(bytes_to_int(self._flv_data[current : current + 4]) == 11 + tag_data_size)
+            assert(bytes_to_int(self._flv_data[current:current+4]) == 11 + tag_data_size)
             current += 4
     
     def video_extract(self):
@@ -78,12 +78,12 @@ class parse:
         current = self._bytes_begin
         while current < self._size:
             tag_type = self._flv_data[current]         
-            tag_data_size = bytes_to_int(self._flv_data[current + 1 : current + 4])
-            tag_data = self._flv_data[current + 11 : current + 11 + tag_data_size]
+            tag_data_size = bytes_to_int(self._flv_data[current+1:current+4])
+            tag_data = self._flv_data[current+11:current+11+tag_data_size]
             if tag_type == VIDEO:
                 if tag_data[0] == 0x17 and tag_data[1] == 0x00:
                     self._video_tag_header = video_tag_header(tag_data)
-                    self._h264_data += b"\x00\x00\x00\x01" + self._video_tag_header.sps_data + b"\x00\x00\x00\x01" + self._video_tag_header.pps_data 
+                    self._h264_data += b"\x00\x00\x00\x01" + self._video_tag_header.sps_data + b"\x00\x00\x00\x01" + self._video_tag_header.pps_data# assert the video only have one sps and one pps 
                 else:
                     assert((tag_data[0] & 0xf) == 7) #assert for avc only
                     if tag_data[1] == 0x1:
@@ -100,7 +100,7 @@ class parse:
                                 nalu_length = bytes_to_int(tag_data[begin:begin+4])
                                 begin += 4    
             current += 11 + tag_data_size
-            assert(bytes_to_int(self._flv_data[current : current + 4]) == 11 + tag_data_size)
+            assert(bytes_to_int(self._flv_data[current:current+4]) == 11 + tag_data_size)
             current += 4
 
     def save_extract_data(self, output_file):
@@ -116,7 +116,7 @@ class parse:
             with open(output_file, "wb") as f:
                 f.write(self._h264_data)
         else:
-            raise RuntimeError("the output file must end with aac!")
+            raise RuntimeError("the output file must end with aac or h264!")
             
     def start(self):
         '''
